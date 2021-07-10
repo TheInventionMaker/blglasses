@@ -1,6 +1,7 @@
 import requests
 import os
-os.chdir("blglasses")
+if(os.path.isfile("blglasses")):
+        os.chdir("blglasses")
 response = requests.get("https://api.github.com/repos/TheInventionMaker/blglasses/releases/latest")
 version = response.json()["tag_name"]
 if(os.path.isfile(version + '.txt')):
