@@ -18,6 +18,7 @@ else:
         print("Setting updater...")
         os.chdir("/home/pi")
         os.system("sudo rm updater.py")
-        os.system("mv /blglasses/updater.py /home/pi")
+        os.chdir("blglasses")
+        os.system("mv updater.py /home/pi")
         os.system("ls") 
         print("Updating Complete.")
