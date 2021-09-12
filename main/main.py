@@ -1,43 +1,48 @@
 #MAIN PROGRAM FOR THE GLASSES
-import RPi.GPIO as GPIO
 import signal
 import sys
+import RPi.GPIO as GPIO
 from gpiozero import Button
 import pyttsx3
 import subprocess
-import asyncio
 import time
 import board
 import digitalio
 import adafruit_lis3dh
+import VL53L1X
+import asyncio
+import TCA9548A
+import datetime
+import wikipedia
+import os
+import wolframalpha
+import requests
+import threading
+import spidev
+
+
+
 i2c = board.I2C()
 int1 = digitalio.DigitalInOut(board.D6)  # Set this to the correct pin for the interrupt!
 lis3dh = adafruit_lis3dh.LIS3DH_I2C(i2c, int1=int1)
 lis3dh.set_tap(1, 120)
 shaken = True
-#timer = 100
    
 engine = pyttsx3.init() # object creation
 rate = engine.getProperty('rate')   # getting details of current speaking rate
 engine.setProperty('rate',170)
 engine.setProperty('volume',1.0)
+
+
 GPIO.setwarnings(False)
 GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-#GPIO.setup(17, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-import multiprocessing
-import time
-import VL53L1X
-import time
-#!/usr/bin/python
-import asyncio
-#rom aio_timers import Timer
-import TCA9548A
-import RPi.GPIO as GPIO
-import time
 GPIO.setup(27, GPIO.OUT)
 GPIO.setup(22, GPIO.OUT)
-# set specific multiplexer to a specific channel
-# TCA9548A.I2C_setup( multiplexer_addr , multiplexer_channel )
+GPIO.output(22, GPIO.LOW)
+GPIO.output(27, GPIO.LOW)
+time.sleep(1)
+
+
 TCA9548A.I2C_setup(0x70,0)
 tof = VL53L1X.VL53L1X(i2c_bus=1, i2c_address=0x29)
 tof.open()
@@ -51,12 +56,48 @@ tof2.open()
 tof2.set_timing(66000, 70)
 tof2.start_ranging(3)  # Start ranging
 distance_in_mm = tof2.get_distance()
+
 TCA9548A.I2C_setup(0x70,2)
 tof3 = VL53L1X.VL53L1X(i2c_bus=1, i2c_address=0x29)
 tof3.open()
 tof3.set_timing(66000, 70)
 tof3.start_ranging(3)  # Start ranging
 tof3.get_distance()
+
+spi_ch = 0
+spi = spidev.SpiDev(0, spi_ch)
+spi.max_speed_hz = 1200000
+
+sidewalkDetecting = False
+pastSidewalk = False
+objectDetection = subprocess.Popen(["python3","TFLite_detection_webcam.py", "--model=Sample_TFLite_model"])
+pastVolume = 0.0
+sleep = 10
+updateNeeded = False
+btn = Button(17)
+confirmBtn = Button(5)
+
+settingOptions = ["Disable Image Recognition","Change Image Distance","Change Image Sensitivity",
+"Disable Navigation","Disable Vibration","Change Nav Distance","Change Vibration Distance","Disable Smart Assistant",
+"Change voice speed","Change sleep time","Change Wifi","System Report (Only do this if you are seated)","Exit"]
+
+settingSelection = 9
+scrollValue = 0
+settingsEntered = False
+usingScroll = False
+units = ""
+imgRecog = True
+imgSens = 75
+imgDist = 48
+navigation = False
+vibDist = 48
+smartEnabled = True
+voiceSpeed = 170
+navDist = 48
+stopVibration = True
+btn.hold_time = 2
+notUpdating = True
+
 def sidewalkDetection():
     p1 = subprocess.Popen(["python3","classify_picamera.py","--model","SidewalkModel/model.tflite","--labels","SidewalkModel/labels.txt"])
 async def forward():
@@ -108,7 +149,13 @@ def navigationF():
     dists = [d1,d2,d3]
 
     return available[dists.index(max(dists))]
-    
+
+#
+#
+#SMART
+#ASSISTANT
+#
+#    
 def smartAssistant():
     global engine
     engine.say("Listening...")
@@ -134,44 +181,7 @@ def smartAssistant():
             assistant(response)
             print("$done")
 
-#
-#
-#SMART
-#ASSISTANT
-#
-#
-import multiprocessing
-import speech_recognition as sr
-import pyttsx3
-import datetime
-import wikipedia
-import webbrowser
-import os
-import time
-import subprocess
-#from ecapture import ecapture as ec
-import wolframalpha
-import json
-import requests
-import threading
-import RPi.GPIO as GPIO
-import signal
-import sys
-from gpiozero import Button
-import pyttsx3
-engine = pyttsx3.init() # object creation
-rate = engine.getProperty('rate')   # getting details of current speaking rate
-engine.setProperty('rate',170)
-engine.setProperty('volume',1.0)
-GPIO.setwarnings(False)
-#GPIO.setmode(GPIO.BOARD)
-GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-GPIO.output(22, GPIO.LOW)
-GPIO.output(27, GPIO.LOW)
-time.sleep(1)
-#button = Button(3)
 def onWord(name, location, length):
-#    print('word', name, location, length)
     if location > 10:
         engine.stop()
 def sayFunc(phrase):
@@ -186,26 +196,16 @@ def say(phrase):
     engine.say(phrase)
     print(phrase)
     engine.runAndWait()
+
 #CREDIT TO: https://towardsdatascience.com/how-to-build-your-own-ai-personal-assistant-using-python-f57247b4494b
-#FUNCTIONS
+
 def speak(word):
     if len(word) > 50:
-       # print("Tap anytime to stop answering")
-       # sayFunc("Tap anytime to stop answering")
         print(word)
         say(word)
     else:
         print(word)
         say(word)
-def wishMe():
-    hour=datetime.datetime.now().hour
-    if hour>=0 and hour<12:
-        speak("Hello,Good Morning")
-    elif hour>=12 and hour<18:
-        speak("Hello,Good Afternoon")
-    else:
-        speak("Hello,Good Evening")
-
 def assistant(statement):
     if "exit" in statement or "quit" in statement or "nevermind" in statement or "goodbye" in statement or "ok bye" in statement or "stop" in statement:
         speak('shutting down')
@@ -233,20 +233,10 @@ def assistant(statement):
             statement =statement.replace("wikipedia", "")
             results = wikipedia.summary(statement, sentences=3)
             speak(results)
+
 #
 # POT
 #
-import signal
-import sys
-import time
-import spidev
-import RPi.GPIO as GPIO
-
-spi_ch = 0
-
-# Enable SPI
-spi = spidev.SpiDev(0, spi_ch)
-spi.max_speed_hz = 1200000
 
 def close(signal, frame):
     sys.exit(0)
@@ -274,15 +264,16 @@ def get_adc(channel):
     voltage = (5 * adc) / 1024
 
     return voltage
-sidewalkDetecting = False
-pastSidewalk = False
 
 
-objectDetection = subprocess.Popen(["python3","TFLite_detection_webcam.py", "--model=Sample_TFLite_model"])
-pastVolume = 0.0
 
 
-sleep = 60
+    
+async def timer():
+     await asyncio.gather(
+        asyncio.create_task(async_foo())
+    )
+# timer is scheduled here
 def async_foo():
     global sleep
     global shaken
@@ -293,36 +284,19 @@ def async_foo():
     print(objectDetection.poll())
     objectDetection.terminate()
     print(objectDetection.poll())
-    
-async def timer():
-     await asyncio.gather(
-        asyncio.create_task(async_foo())
-    )
-# timer is scheduled here
-import threading
-from gpiozero import Button
-btn = Button(17)
-confirmBtn = Button(5)
+    if(os.path.isfile("blglasses/main")):
+        os.chdir("blglasses/main")
+    response = requests.get("https://api.github.com/repos/TheInventionMaker/blglasses/releases/latest")
+    version = response.json()["tag_name"]
+    if(os.path.isfile(version + '.txt')):
+        updateNeeded = False
+    else:
+        say("Update found and will proceed once you plug in the glasses.")
+        updateNeeded = True
+        update()
+        
 thr = threading.Thread(target=async_foo, args=(), kwargs={})
 thr.start() 
-
-settingOptions = ["Disable Image Recognition","Change Image Distance","Change Image Sensitivity",
-"Disable Navigation","Disable Vibration","Change Nav Distance","Change Vibration Distance","Disable Smart Assistant",
-"Change voice speed","Change sleep time","Change Wifi","System Report (Only do this if you are seated)","Exit"]
-
-settingSelection = 9
-scrollValue = 0
-settingsEntered = False
-usingScroll = False
-units = ""
-imgRecog = True
-imgSens = 75
-imgDist = 48
-navigation = True
-vibDist = 48
-smartEnabled = True
-voiceSpeed = 170
-navDist = 48
 def settings():
     global navDist, sleep, voiceSpeed, smartEnabled, vibDist, stopVibration, navigation, settingsEntered, settingOptions, settingSelection, imgRecog, objectDetection, imgSens, imgDist, usingScroll, units
     if settingSelection == 0:
@@ -407,10 +381,12 @@ def shook():
         thr.start() 
         if objectDetection.poll() is not None and imgRecog:
             objectDetection = subprocess.Popen(["python3","TFLite_detection_webcam.py", "--model=Sample_TFLite_model"])
-stopVibration = True
-btn.hold_time = 2
 
-while True:
+def update():
+    os.chdir(os.path.expanduser("~"))
+    subprocess.run(["python3","updater.py"])
+    notUpdating = False
+while notUpdating:
     try:
         #TEMP CHECK
         output = subprocess.check_output(['vcgencmd','measure_temp'])
@@ -532,6 +508,7 @@ while True:
         print("program executed")
         break
 
+say("Updating...")
 #Currently supported features
 #Working right now:
 # - Wake and sleep detection
