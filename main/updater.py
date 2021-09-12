@@ -1,5 +1,6 @@
 import requests
 import os
+import subprocess
 os.chdir("blglasses/main")
 response = requests.get("https://api.github.com/repos/TheInventionMaker/blglasses/releases/latest")
 version = response.json()["tag_name"]
@@ -21,3 +22,4 @@ else:
         os.system("mv updater.py /home/pi")
         os.system("ls") 
         print("Updating Complete.")
+        main = subprocess.Popen(["python3","main.py"])
