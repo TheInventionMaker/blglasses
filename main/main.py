@@ -381,7 +381,7 @@ def shook():
         thr.start() 
         if objectDetection.poll() is not None and imgRecog:
             objectDetection = subprocess.Popen(["python3","TFLite_detection_webcam.py", "--model=Sample_TFLite_model"])
-
+excepted = False
 def update():
     global notUpdating
     os.chdir(os.path.expanduser("~"))
@@ -505,14 +505,15 @@ while notUpdating:
         #Run image classification for sidewalk if not asleep
         #If sidewalk detected, run the side script
 
-    except KeyboardInterrupt:
-        GPIO.output(22, GPIO.LOW)
-        GPIO.output(27, GPIO.LOW)
-        print("program executed")
+    except Exception:
+        say("Program crashed. Please wait.")
+        time.sleep(2)
+        subprocess.run(["python3","main.py"])
+        excepted = True
         break
-
-say("Updating...")
-update()
+if not excepted:
+    say("Updating...")
+    update()
 #Currently supported features
 #Working right now:
 # - Wake and sleep detection
@@ -531,6 +532,9 @@ update()
 # - Temperature Warning
 # - System Report
 # - Room navigation using distance sensors
+# - Updater script
+# - Github repo
+# - Redundancy (File restarts if crasheds)
 
 #Not yet working:
 # - Wifi Switching
@@ -540,5 +544,3 @@ update()
 # - Custom Object recognition
 # - Sidewalk people & other objects
 # - Battery management
-# - Updater script
-# - Github repo
