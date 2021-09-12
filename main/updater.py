@@ -1,6 +1,6 @@
 import requests
 import os
-if(os.path.isfile("blglasses/main")):
+if(os.path.isfile("blglasses/main") == False):
         os.chdir("blglasses/main")
 os.system("ls")
 response = requests.get("https://api.github.com/repos/TheInventionMaker/blglasses/releases/latest")
