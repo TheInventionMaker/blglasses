@@ -276,7 +276,7 @@ async def timer():
 # timer is scheduled here
 def async_foo():
     global sleep
-    global shaken
+    global shaken, updateNeeded
     for _ in range(0,sleep):
         time.sleep(1)
     shaken = False
@@ -293,7 +293,7 @@ def async_foo():
     else:
         say("Update found and will proceed once you plug in the glasses.")
         updateNeeded = True
-        update()
+        
         
 thr = threading.Thread(target=async_foo, args=(), kwargs={})
 thr.start() 
@@ -383,11 +383,14 @@ def shook():
             objectDetection = subprocess.Popen(["python3","TFLite_detection_webcam.py", "--model=Sample_TFLite_model"])
 
 def update():
+    global notUpdating
     os.chdir(os.path.expanduser("~"))
-    subprocess.run(["python3","updater.py"])
+    updater = subprocess.Popen(["python3","updater.py"])
     notUpdating = False
 while notUpdating:
     try:
+        if updateNeeded:
+            notUpdating = False
         #TEMP CHECK
         output = subprocess.check_output(['vcgencmd','measure_temp'])
         output = str(str(output)[7:len(str(output)) - 5])
@@ -509,6 +512,7 @@ while notUpdating:
         break
 
 say("Updating...")
+update()
 #Currently supported features
 #Working right now:
 # - Wake and sleep detection
