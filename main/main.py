@@ -36,6 +36,7 @@ engine.setProperty('volume',1.0)
 
 GPIO.setwarnings(False)
 GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+GPIO.setup(13, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 GPIO.setup(27, GPIO.OUT)
 GPIO.setup(22, GPIO.OUT)
 GPIO.output(22, GPIO.LOW)
@@ -72,7 +73,7 @@ sidewalkDetecting = False
 pastSidewalk = False
 objectDetection = subprocess.Popen(["python3","TFLite_detection_webcam.py", "--model=Sample_TFLite_model"])
 pastVolume = 0.0
-sleep = 10
+sleep = 600
 updateNeeded = False
 btn = Button(17)
 confirmBtn = Button(5)
@@ -97,6 +98,7 @@ navDist = 48
 stopVibration = True
 btn.hold_time = 2
 notUpdating = True
+isCharging = False
 
 def sidewalkDetection():
     p1 = subprocess.Popen(["python3","classify_picamera.py","--model","SidewalkModel/model.tflite","--labels","SidewalkModel/labels.txt"])
@@ -279,6 +281,10 @@ def async_foo():
     global shaken, updateNeeded
     for _ in range(0,sleep):
         time.sleep(1)
+    sleepF()
+def sleepF():
+    global sleep
+    global shaken, updateNeeded
     shaken = False
     print("Going to sleep...")
     print(objectDetection.poll())
@@ -373,8 +379,8 @@ def settings():
         settingsEntered = False
         speak("Exited settings")
 def shook():
-    global shaken, objectDetection
-    if shaken == False:
+    global shaken, objectDetection, isCharging
+    if shaken == False and isCharging == False:
         print("Wakened!")
         shaken = True
         thr = threading.Thread(target=async_foo, args=(), kwargs={})
@@ -389,7 +395,16 @@ def update():
     notUpdating = False
 while notUpdating:
     try:
-        if updateNeeded:
+        if GPIO.input(13) == GPIO.HIGH and not isCharging:
+            isCharging = True
+            sleepF()
+            print("Charging")
+        elif GPIO.input(13) == GPIO.LOW and  isCharging:
+            isCharging = False
+            print("No longer charging")
+            shook()
+
+        if updateNeeded and isCharging:
             notUpdating = False
         #TEMP CHECK
         output = subprocess.check_output(['vcgencmd','measure_temp'])
@@ -406,12 +421,10 @@ while notUpdating:
         if lis3dh.shake(shake_threshold=15):
             shook()
                 
-        if shaken:
-            pass
 
         #DISTANCE
         if sidewalkDetecting == False:
-            if shaken == True and stopVibration == False:
+            if shaken == True and stopVibration == False and isCharging == False:
                 asyncio.run(main())
             else:
                 GPIO.output(22, GPIO.LOW)
@@ -420,7 +433,7 @@ while notUpdating:
             pastSidewalk = True
             sidewalkDetection()
 
-        if shaken and navigation:
+        if shaken and navigation and isCharging == False:
             if distsTest():
                 say("Navigate " + navigationF())
         #FEATURES
@@ -506,7 +519,7 @@ while notUpdating:
         #If sidewalk detected, run the side script
 
     except Exception:
-        say("Program crashed. Please wait.")
+        say("Program crashed. Please wait..")
         time.sleep(2)
         subprocess.run(["python3","main.py"])
         excepted = True
@@ -535,12 +548,14 @@ if not excepted:
 # - Updater script
 # - Github repo
 # - Redundancy (File restarts if crasheds)
+# - Charge Detection
 
 #Not yet working:
 # - Wifi Switching
-# - Auto switching for headphones
-# - System check (Not fully done)
 # - Sidewalk detection using classification
 # - Custom Object recognition
 # - Sidewalk people & other objects
 # - Battery management
+
+#Possible implementation:
+# - Headphones & Auto Switching (Seems to work in principle, but the switch isn't fully closing.)
